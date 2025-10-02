@@ -1,7 +1,6 @@
 import torch
 import utils
 from abc import abstractmethod
-
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class BaseModel():
@@ -107,15 +106,24 @@ class BaseModel():
         # 학습 가중 치 저장 
         utils.save_weights(ckpt_dir, self.get_model_weights(), epoch)
         
-    def load(self, ckpt_dir, epoch=None):
-        # 학습된 모델의 가중치 불러오기
-        st_epoch, weights = utils.load_weights(ckpt_dir, epoch)
-        # st_epoch > 1 때만 가중치 업데이트
-        if st_epoch > 1:
-           self.model_weights = weights
-           self.set_model_weights()
-        return st_epoch
+    def load(self, ckpt_dir, epoch=None, map_location=None): # <--- Add map_location=None here
+        # Pass the argument to the utils function
+        st_epoch, weights = utils.load_weights(ckpt_dir, epoch, map_location=map_location) # <--- Pass it here
 
+        if self.multi_gpus:
+            self.generator.module.load_state_dict(weights['generator'])
+            # ... (rest of the function is unchanged)
+        else:
+            self.generator.load_state_dict(weights['generator'])
+
+        if 'discriminator' in weights:
+            if self.multi_gpus:
+                self.discriminator.module.load_state_dict(weights['discriminator'])
+            else:
+                self.discriminator.load_state_dict(weights['discriminator'])
+
+        print('loaded weights (epoch %d)' % st_epoch)
+        return st_epoch
 
     
      

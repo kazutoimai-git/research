@@ -19,6 +19,7 @@ class Model(BaseModel):
         self.generator_mask = networks.Unet3(3, 1, nker, use_resize=self.use_resize).to(DEVICE)
         self.generator = networks.UnetWithAttentionMultiOut(in_channels + 1, out_channels, nker, attention_mode='RCBAM', relu=0.2, use_resize=self.use_resize).to(DEVICE)
         self.discriminator = networks.Pix2PixDiscriminator().to(DEVICE)
+        self.multi_gpus = False
 
         # 가중치 초기화
         networks.init_weights(self.generator, init_type='normal', init_gain=0.02)

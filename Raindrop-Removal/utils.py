@@ -5,6 +5,7 @@ import torch
 import math 
 import numpy as np 
 from datetime import datetime
+import glob
 
 IMG_EXT = ['.bmp', '.jpg', '.png', '.tif']
 
@@ -38,22 +39,20 @@ def save_weights(ckpt_dir, model_weights, epoch):
     torch.save(model_weights, 
                 os.path.join(ckpt_dir, f'model_epoch{epoch}.pth' ))
 
-def load_weights(ckpt_dir, epoch=None):
-    ckpt_list = os.listdir(ckpt_dir)
-    ckpt_list = [f for f in ckpt_list if f.endswith('pth')]
-        
-    if len(ckpt_list) == 0:
-        epoch = 1
-        model_weights = None
-    else:
-        if epoch == None:
-            ckpt_list.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
-            epoch = int(ckpt_list[-1].split('epoch')[1].split('.pth')[0])
-            model_weights = torch.load(os.path.join(ckpt_dir, ckpt_list[-1]))
-        else:
-            model_weights = torch.load(os.path.join(ckpt_dir, f'model_epoch{epoch}.pth'))
-    return epoch, model_weights
+def load_weights(ckpt_dir, epoch=None, map_location=None): # <--- Add map_location=None here
+    if epoch is None: # load latest
+        # ... (rest of the if block is unchanged)
+        ckpt_list = sorted(glob.glob(os.path.join(ckpt_dir, 'model_epoch*.pth')))
+        if len(ckpt_list)==0: return -1, None
+        ckpt_path = ckpt_list[-1]
+        epoch = int(ckpt_path.split('epoch')[-1].split('.pth')[0])
+    else: # load specific epoch
+        ckpt_path = os.path.join(ckpt_dir, 'model_epoch%d.pth'%epoch)
 
+    # Change this line to use the map_location argument
+    model_weights = torch.load(ckpt_path, map_location=map_location) # <--- Use the new argument
+
+    return epoch, model_weights
 #---------------------------------------------------
 #
 #                  LOSS 
