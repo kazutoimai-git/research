@@ -1,0 +1,21 @@
+# Ignore dataset folders
+data/
+dataset/
+datasets/
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Ignore large media files
+*.mp4
+*.avi
+*.mov
+*.jpg
+*.png
+
+# Ignore temporary files
+__pycache__/
+*.pyc
+.DS_Store
+

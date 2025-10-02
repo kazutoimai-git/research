@@ -1,0 +1,17 @@
+elephant
+joblib
+matplotlib
+numpy
+opencv-python
+Pillow
+PyYAML
+scikit-learn
+scipy
+sklearn
+torch
+torchelastic
+torchtext
+torchvision
+webcolors
+yacs
+zipp
