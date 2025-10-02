@@ -8,7 +8,6 @@ datasets/
 *.7z
 
 # Ignore large media files
-*.mp4
 *.avi
 *.mov
 *.jpg

@@ -6,20 +6,17 @@ import sys
 import argparse
 
 # --- 1. モデルのリポジトリへのパスを追加 ---
-# このスクリプトが 'research/LaneDetection/' ディレクトリにあると仮定
+# このスクリプト(pipeline.py)が 'research' ディレクトリにあり、
+# 'Raindrop-Removal' と 'TwinLiteNet' も同じ 'research' ディレクトリにあると仮定した構成
 # 'research/'
-#   |- LaneDetection/
-#   |   |- pipeline.py
-#   |- Raindrop-Removal/
-#   |- TwinLiteNet/
+#  |- pipeline.py
+#  |- Raindrop-Removal/
+#  |- TwinLiteNet/
 
-# スクリプトの場所を基準に親ディレクトリを取得
+# スクリプトの場所を基準に各リポジトリへのパスを追加
 script_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(script_dir)
-
-# 親ディレクトリを基準に各リポジトリへのパスを追加
-sys.path.append(os.path.join(parent_dir, 'Raindrop-Removal'))
-sys.path.append(os.path.join(parent_dir, 'TwinLiteNet'))
+sys.path.append(os.path.join(script_dir, 'Raindrop-Removal'))
+sys.path.append(os.path.join(script_dir, 'TwinLiteNet'))
 
 
 # --- 2. モデル定義とヘルパー関数の準備 ---
@@ -58,15 +55,18 @@ def main_pipeline(input_video_path, output_video_path):
 
     # --- モデルのロード ---
     print("Loading models...")
-    
+
     # 1. 雨除去モデルのロード
     rain_removal_model = None
     if RainRemovalModel:
         try:
             rain_removal_model = RainRemovalModel(phase='test')
-            rain_weights_path = os.path.join(parent_dir, 'Raindrop-Removal', 'checkpoint', 'proposed', 'model_epoch1800.pth')
-            
+            # スクリプトからの相対パスで重みファイルへのパスを指定
+            rain_weights_path = os.path.join(script_dir, 'Raindrop-Removal', 'checkpoint', 'proposed', 'model_epoch1800.pth')
+
             if os.path.exists(rain_weights_path):
+                # loadメソッドにはディレクトリパスを渡す必要があるかもしれません。
+                # もしエラーが出る場合は、元のリポジトリの仕様をご確認ください。
                 rain_removal_model.load(os.path.dirname(rain_weights_path))
                 rain_removal_model.generator.to(device)
                 rain_removal_model.generator_mask.to(device)
@@ -91,11 +91,12 @@ def main_pipeline(input_video_path, output_video_path):
             lane_detection_model = TwinLiteNet()
             lane_detection_model = torch.nn.DataParallel(lane_detection_model)
             lane_detection_model = lane_detection_model.to(device)
-            lane_weights_path = os.path.join(parent_dir, 'TwinLiteNet', 'pretrained', 'best.pth')
-            
+            # スクリプトからの相対パスで重みファイルへのパスを指定
+            lane_weights_path = os.path.join(script_dir, 'TwinLiteNet', 'pretrained', 'best.pth')
+
             if not os.path.exists(lane_weights_path):
                 raise FileNotFoundError(f"Lane detection weights not found at {lane_weights_path}")
-                
+
             lane_detection_model.load_state_dict(torch.load(lane_weights_path, map_location=device))
             lane_detection_model.eval()
             print("Lane detection model loaded successfully.")
@@ -110,7 +111,7 @@ def main_pipeline(input_video_path, output_video_path):
     if not os.path.exists(input_video_path):
         print(f"Error: Could not open video file {input_video_path}")
         return
-        
+
     cap = cv2.VideoCapture(input_video_path)
     if not cap.isOpened():
         print(f"Error: Failed to open video capture for {input_video_path}")
@@ -119,9 +120,10 @@ def main_pipeline(input_video_path, output_video_path):
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
-    
+
+    # 出力ディレクトリが存在しない場合は作成
     os.makedirs(os.path.dirname(output_video_path), exist_ok=True)
-    
+
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_video_path, fourcc, fps, (frame_width, frame_height))
 
@@ -132,14 +134,14 @@ def main_pipeline(input_video_path, output_video_path):
         ret, frame = cap.read()
         if not ret:
             break
-            
+
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         processed_frame = frame
 
         # --- ステップ1: 雨除去 ---
         if rain_removal_model:
             input_tensor = numpy2tensor(frame_rgb).to(device)
-            
+
             with torch.no_grad():
                 mask  = rain_removal_model.generator_mask(input_tensor)
                 output_tensor, _, _ = rain_removal_model.generator(torch.cat((input_tensor, mask), dim=1))
@@ -160,20 +162,20 @@ def main_pipeline(input_video_path, output_video_path):
 
             with torch.no_grad():
                 output_da, output_ll = lane_detection_model(img_tensor)
-            
+
             _, da_predict = torch.max(output_da, 1)
             _, ll_predict = torch.max(output_ll, 1)
 
             DA = da_predict.byte().cpu().data.numpy()[0] * 255
             LL = ll_predict.byte().cpu().data.numpy()[0] * 255
-            
+
             img_rs[DA > 100] = [255, 0, 0]
             img_rs[LL > 100] = [0, 255, 0]
 
             processed_frame = cv2.resize(img_rs, (frame_width, frame_height))
 
         out.write(processed_frame)
-        
+
         frame_count += 1
         if frame_count % 30 == 0:
             print(f"Processed {frame_count} frames...")
@@ -189,8 +191,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Rain removal and lane detection pipeline for driving videos.')
     parser.add_argument('--input', type=str, required=True,
                         help='Path to the input rainy video file.')
-    parser.add_argument('--output', type=str, default='../results/result.mp4',
+    # 出力先のデフォルト値を変更
+    parser.add_argument('--output', type=str, default='results/result.mp4',
                         help='Path to save the processed output video.')
     args = parser.parse_args()
-    
+
     main_pipeline(args.input, args.output)
