@@ -148,7 +148,7 @@ def main_pipeline(input_video_path, output_video_path):
 
             rain_removed_frame_np = tensor2numpy(output_tensor).squeeze(0)
             rain_removed_frame = (rain_removed_frame_np * 255).astype(np.uint8)
-            processed_frame = cv2.cvtColor(rain_removed_frame, cv2.COLOR_RGB_BGR)
+            processed_frame = cv2.cvtColor(rain_removed_frame, cv2.COLOR_RGB2BGR)
 
         # --- ステップ2: 白線検出 ---
         if lane_detection_model:
